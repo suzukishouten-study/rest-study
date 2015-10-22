@@ -111,61 +111,99 @@ class TodoListsController extends AppController {
 	}
 
 	public function upload() {
-		$files = $this->getUploadFileParams();
-		$owner = $this->Auth->user()['id'];
-		$numTodos = 0;
-		$errors = array ();
-		foreach ( $files as $file ) {
-			$fileName = $file['name'];
-			$filePath = $file['tmp_name'];
-			$todos = file($filePath, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
-			$assignee = $owner;
-			$lineNo = 1;
-			foreach ( $todos as $todo ) {
-				$data = array ();
-				$data['todo'] = $todo;
-				$data['status'] = 0;
-				$data['owner'] = $owner;
-				$data['assignee'] = $assignee;
-				$res = $this->TodoList->save($data);
-				if ($res) {
-					$numTodos++;
-				} else {
-					if (count($this->TodoList->validationErrors) > 0) {
-						foreach ( $this->TodoList->validationErrors as $validationErrorsOfLine ) {
-							$title = 'file:' . $fileName . ' - line: ' . $lineNo . ': ';
-							foreach ( $validationErrorsOfLine as $validationError ) {
-								$errors[] = array (
-												$title . $validationError
-								);
-							}
-						}
-					}
-				}
-				$this->TodoList->create();
-				$lineNo++;
-			}
-		}
-		if (count($errors) > 0) {
-			$this->TodoList->validationErrors = $errors;
-			$response = $this->editResponse(false);
-			array_unshift($response['errors'], array (
-							'以下のエラーが発生しました。'
-			));
-			if ($numTodos > 0) {
-				array_unshift($response['errors'], array (
-								$numTodos . '件のTODOを登録しました。'
-				));
-			}
-		} else {
-			$response = $numTodos . '件のTODOを登録しました。';
-		}
+		$fileUploadParams = $this->getUploadFileParams();
+		$loginUserId = $this->getLoginUserId();
+		$owner = $loginUserId;
+		$assignee = $loginUserId;
+		$errors = array();
+		$numRegists = $this->registerFilesAsTodos($fileUploadParams, $owner, $assignee, $errors);
+		$response = $this->editUploadResponse($numRegists, $errors);
 		$this->set(compact('response'));
 		$this->set('_serialize', 'response');
 	}
 
+	//アップロードのPOSTデータを取得する
 	protected function getUploadFileParams(){
 		return $this->request->params['form'];
+	}
+
+	//ログイン中ユーザのIDを取得する
+	protected function getLoginUserId(){
+		return $this->Auth->user()['id'];
+	}
+
+	//アップロードされたファイル群を読み込んでTODOとしてDBに登録する
+	private function registerFilesAsTodos($fileUploadParams, $owner, $assignee, &$errors){
+		$numRegists = 0;
+		//$errors = array();
+		foreach ( $fileUploadParams as $fileUploadParam ) {
+			$fileName = $fileUploadParam['name'];
+			$filePath = $fileUploadParam['tmp_name'];
+			$todos = $this->readUploadTodoFile($filePath);
+			$numRegists += $this->registerTodos($fileName, $todos, $owner, $assignee, $errors);
+		}
+		return $numRegists;
+	}
+
+	// アップロードされたファイルを読み込んで配列に格納して返す
+	protected function readUploadTodoFile($filePath){
+		return file($filePath, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+	}
+
+	// 配列に格納されたTODOをDBに登録する
+	private function registerTodos($fileName, $todos, $owner, $assignee, &$errors){
+		$numRegists = 0;
+		$lineNo = 1;
+		foreach ( $todos as $todo ) {
+			$record = array ();
+			$record['todo'] = $todo;
+			$record['status'] = 0;
+			$record['owner'] = $owner;
+			$record['assignee'] = $assignee;
+			$res = $this->TodoList->save($record);
+			if ($res) {
+				$numRegists++;
+			} else {
+				$validationErrors = $this->TodoList->validationErrors;
+				if (count($validationErrors) > 0) {
+					$this->formatValidationErrorMessage($fileName, $lineNo, $validationErrors, $errors);
+				}
+			}
+			$this->TodoList->create();
+			$lineNo++;
+		}
+		return $numRegists;
+	}
+
+	// バリデーションエラーの内容を整形する
+	private function formatValidationErrorMessage($fileName, $lineNo, $validationErrors, &$errors){
+		foreach ( $validationErrors as $validationErrorsOfLine ) {
+			$title = 'file:' . $fileName . ' - line: ' . $lineNo . ': ';
+			foreach ( $validationErrorsOfLine as $validationError ) {
+				$errors[] = array (
+					$title . $validationError
+				);
+			}
+		}
+	}
+
+	// アップロード処理結果のメッセージをクライアント向けに整形する
+	private function editUploadResponse($numRegists, $errors){
+		if (count($errors) > 0) {
+			$this->TodoList->validationErrors = $errors;
+			$response = $this->editResponse(false);
+			array_unshift($response['errors'], array (
+				'以下のエラーが発生しました。'
+			));
+			if ($numRegists > 0) {
+				array_unshift($response['errors'], array (
+					$numRegists . '件のTODOを登録しました。'
+				));
+			}
+		} else {
+			$response = $numRegists . '件のTODOを登録しました。';
+		}
+		return $response;
 	}
 
 	//レスポンスを編集
