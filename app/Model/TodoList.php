@@ -71,7 +71,7 @@ class TodoList extends AppModel {
 	//独自バリデーションルール
 	//担当者として指定されたIDがusersテーブルに存在するかチェックする
 	public function existsUser($userId){
-		$userModel = new User();
+		$userModel = ClassRegistry::init('User');
 		$count = $userModel->find('count', array('conditions'=>array('id'=>$userId), 'recursive' => -1));
 		return $count > 0;
 	}

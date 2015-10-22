@@ -111,15 +111,15 @@ class TodoListsController extends AppController {
 	}
 
 	public function upload() {
-		$files = $this->request->params['form'];
+		$files = $this->getUploadFileParams();
 		$owner = $this->Auth->user()['id'];
 		$numTodos = 0;
+		$errors = array ();
 		foreach ( $files as $file ) {
 			$fileName = $file['name'];
 			$filePath = $file['tmp_name'];
 			$todos = file($filePath, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
 			$assignee = $owner;
-			$errors = array ();
 			$lineNo = 1;
 			foreach ( $todos as $todo ) {
 				$data = array ();
@@ -162,6 +162,10 @@ class TodoListsController extends AppController {
 		}
 		$this->set(compact('response'));
 		$this->set('_serialize', 'response');
+	}
+
+	protected function getUploadFileParams(){
+		return $this->request->params['form'];
 	}
 
 	//レスポンスを編集
