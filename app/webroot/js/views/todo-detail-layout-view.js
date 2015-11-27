@@ -1,8 +1,8 @@
 //詳細画面用レイアウトビュー
 define(function(require) {
-    var TodoDetailItemView = require('views/todo-detail-item-view');
-    var TodoModel = require('models/todo-model');
-    var UserCollection = require('collections/user-collection');
+	var TodoDetailItemView = require('views/todo-detail-item-view');
+	var TodoModel = require('models/todo-model');
+	var UserCollection = require('collections/user-collection');
 
 	var TodoDetailLayoutView = Marionette.LayoutView.extend({
 		//テンプレート
@@ -12,30 +12,27 @@ define(function(require) {
 			itemRegion : '#todo-item',
 		},
 
-		onRender : function() {
-			this.userCollection = new UserCollection();
-			this.listenToOnce(this.userCollection, 'reset', this.onLoadUsers, this);
-			this.userCollection.fetch({
-				reset : true
-			});
-		},
-
-		onLoadUsers : function(userCollection){
- 			var todoModel = new TodoModel({
+		onRender: function () {
+			//Todoを取得
+ 			this.todoModel = new TodoModel({
  				id : this.options.modelId
  			});
- 			//モデルのサーバからのデータ取得完了時、描画を行う
-			this.listenToOnce(todoModel, 'sync', this.showItem, this);
- 			//サーバからデータ取得
- 			todoModel.fetch({
- 				wait : true
- 			});
- 		},
+ 			var todoFetching = this.todoModel.fetch();
+			//ユーザ一覧取得
+			var userCollection = new UserCollection();
+			var userFetching = userCollection.fetch();
+			$.when(
+				todoFetching,
+				userFetching
+			).done(function(){
+				this.showItem(this.todoModel, userCollection);
+			}.bind(this));
+		},
 
- 		showItem : function(todoModel) {
+		showItem: function (todoModel, userCollection) {
  			this.itemRegion.show(new TodoDetailItemView({
  				model : todoModel,
- 				userList : this.userCollection.models
+ 				userList : userCollection.models
  			}));
  		},
 

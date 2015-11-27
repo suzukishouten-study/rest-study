@@ -11,8 +11,9 @@ define(function(require){
 
 			it("Todoとユーザ一覧取得", function (done) {
 				var layoutView = _createTodoDetailLayoutView();
-				sinon.stub(layoutView, 'showItem', function (todoModel) {
+				sinon.stub(layoutView, 'showItem', function (todoModel, userCollection) {
 					todoModel.should.be.ok;
+					userCollection.should.be.ok;
 					layoutView.showItem.restore();
 					done();
 				});
